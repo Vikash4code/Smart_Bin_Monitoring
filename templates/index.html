@@ -1,0 +1,159 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>Smart Bin Monitoring</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+  <style>
+    body { background: #f7fbff; padding: 30px; min-height:100vh; }
+
+    .header-row { align-items:center; margin-bottom:25px; }
+    .app-title { font-weight:700; color:#0d2e59; margin:0;}
+
+    .controls { display:flex; gap:16px; align-items:center; }
+
+    /* CENTER THE THREE BINS IN ONE ROW */
+    .bins-wrapper {
+      display:flex;
+      justify-content:center;
+      gap:30px;
+      width:100%;
+    }
+
+    .bin-card {
+      width:230px;
+      padding:16px;
+      border-radius:12px;
+      background:#fff;
+      box-shadow:0 8px 22px rgba(13,46,89,0.06);
+      text-align:center;
+    }
+
+    .bin-body {
+      height:200px;
+      border-radius:10px;
+      position:relative;
+      overflow:hidden;
+    }
+
+    .fill {
+      position:absolute; bottom:0; left:0; right:0;
+      height:0;
+      display:flex; align-items:center; justify-content:center;
+      font-weight:800; color:white;
+      transition:height .6s;
+    }
+
+    .yellow .bin-body { background:linear-gradient(180deg,#fff9d9,#ffd736) }
+    .yellow .fill { background:#e6b800 }
+
+    .green .bin-body { background:linear-gradient(180deg,#e9ffe9,#28a745) }
+    .green .fill { background:#1e7e34 }
+
+    .blue .bin-body { background:linear-gradient(180deg,#e9f2ff,#007bff) }
+    .blue .fill { background:#0056b3 }
+  </style>
+</head>
+<body>
+<div class="container">
+
+  <!-- HEADER -->
+  <div class="d-flex justify-content-between header-row">
+    <h1 class="app-title">Smart Bin Monitoring</h1>
+
+    <div class="controls">
+      <div class="form-check form-switch">
+        <input class="form-check-input" type="checkbox" id="pause-toggle">
+        <label class="form-check-label" for="pause-toggle">Pause Simulator</label>
+      </div>
+
+      <a class="btn btn-outline-secondary" href="/history">History</a>
+    </div>
+  </div>
+
+  <!-- THREE BINS CENTERED -->
+  <div class="bins-wrapper" id="bins"></div>
+
+</div>
+
+<script>
+const BIN_META = [
+  {name:'yellow', label:'Recyclables'},
+  {name:'green',  label:'Organic'},
+  {name:'blue',   label:'General'}
+];
+
+function createBinCard(bin){
+  const card = document.createElement('div');
+  card.className = 'bin-card ' + bin.name;
+  card.innerHTML = `
+    <h5>${bin.label}</h5>
+    <div class="${bin.name}">
+      <div class="bin-body">
+        <div class="fill" id="fill-${bin.name}">0%</div>
+      </div>
+    </div>
+    <div class="mt-2 fw-bold" id="status-${bin.name}">NORMAL</div>
+  `;
+  return card;
+}
+
+function renderBins(){
+  const c = document.getElementById('bins');
+  c.innerHTML = '';
+  BIN_META.forEach(b => c.appendChild(createBinCard(b)));
+}
+
+async function updateBins(){
+  try{
+    const r = await fetch('/levels');
+    const d = await r.json();
+
+    Object.keys(d).forEach(color => {
+      const level = Math.max(0, Math.min(Number(d[color] || 0), 100));
+      const fill = document.getElementById("fill-"+color);
+      const status = document.getElementById("status-"+color);
+
+      if(fill){
+        fill.style.height = level + "%";
+        fill.textContent = level + "%";
+      }
+
+      if(status){
+        if(level >= 90) status.textContent = "FULL";
+        else if(level >= 80) status.textContent = "ALMOST FULL";
+        else status.textContent = "NORMAL";
+      }
+    });
+
+  } catch(err){
+    console.log("Error updating:", err);
+  }
+}
+
+async function loadInitialPause(){
+  try{
+    const r = await fetch('/config');
+    const j = await r.json();
+    document.getElementById('pause-toggle').checked = j.simulator_paused;
+  }catch{}
+}
+
+document.addEventListener("DOMContentLoaded", () => {
+  renderBins();
+  loadInitialPause();
+  updateBins();
+  setInterval(updateBins, 2000);
+
+  document.getElementById('pause-toggle').addEventListener('change', e => {
+    fetch('/config', {
+      method:'PATCH',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({simulator_paused:e.target.checked})
+    });
+  });
+});
+</script>
+</body>
+</html>
