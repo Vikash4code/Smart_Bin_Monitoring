@@ -13,7 +13,7 @@ bins = {
     'blue':   {'interval': 8,  'next_update': time.time()}
 }
 
-CONFIG_POLL_INTERVAL = 6.0   # seconds between /config requests
+CONFIG_POLL_INTERVAL = 5.0   # seconds between /config requests
 _last_config_check = 0.0
 _paused = False
 
